@@ -163,7 +163,7 @@ class ProxyHandler(SocketServer.StreamRequestHandler):
         if not self.doRequest(conn, "GET", req.getPath(), '', req.headers): return ''
         # Delegate response to plugin
         res = self._getresponse(conn)
-        res = ProxyPlugin.delegate(ProxyPlugin.EVENT_MANGLE_RESPONSE, res.clone())
+        res = ProxyPlugin.delegate(ProxyPlugin.EVENT_MANGLE_RESPONSE, res.clone(), req.clone())
         data = res.serialize()
         return data
 
@@ -173,7 +173,7 @@ class ProxyHandler(SocketServer.StreamRequestHandler):
         if not self.doRequest(conn, "POST", req.getPath(), params, req.headers): return ''
         # Delegate response to plugin
         res = self._getresponse(conn)
-        res = ProxyPlugin.delegate(ProxyPlugin.EVENT_MANGLE_RESPONSE, res.clone())
+        res = ProxyPlugin.delegate(ProxyPlugin.EVENT_MANGLE_RESPONSE, res.clone(), req.clone())
         data = res.serialize()
         return data
 
@@ -318,23 +318,23 @@ class ProxyPlugin:
         return r
 
     @staticmethod
-    def delegate(event, arg):
+    def delegate(event, *arg):
         global proxystate
 
         # Allocate a history entry
         hid = proxystate.history.allocate()
 
         if event == ProxyPlugin.EVENT_MANGLE_REQUEST:
-            proxystate.history[hid].setOriginalRequest(arg)
+            proxystate.history[hid].setOriginalRequest(arg[0])
 
             # Process this argument through the plugin
-            mangled_arg = proxystate.plugin.dispatch(ProxyPlugin.EVENT_MANGLE_REQUEST, arg.clone())
+            mangled_arg = proxystate.plugin.dispatch(ProxyPlugin.EVENT_MANGLE_REQUEST, arg[0].clone())
 
         elif event == ProxyPlugin.EVENT_MANGLE_RESPONSE:
-            proxystate.history[hid].setOriginalResponse(arg)
+            proxystate.history[hid].setOriginalResponse(arg[0])
 
             # Process this argument through the plugin
-            mangled_arg = proxystate.plugin.dispatch(ProxyPlugin.EVENT_MANGLE_RESPONSE, arg.clone())
+            mangled_arg = proxystate.plugin.dispatch(ProxyPlugin.EVENT_MANGLE_RESPONSE, arg[0].clone(), arg[1])
 
         if mangled_arg is not None:
             if event == ProxyPlugin.EVENT_MANGLE_REQUEST:
@@ -348,7 +348,7 @@ class ProxyPlugin:
             # No plugin is currently installed, or the plugin does not define
             # the proper method, or it returned None. We fall back on the
             # original argument
-            ret = arg
+            ret = arg[0]
 
         return ret
 
